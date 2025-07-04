@@ -71,3 +71,7 @@ Make sure to have **JSON Server** running on your machine for the app to functio
 3. Start JSON Server with a default database (db.json) in your project folder:
     json-server --watch db.json --port 3000
 4. Open the project in your browser and start managing products!
+
+## GITHUB
+
+-https://github.com/RojasDaniel3/gestion_de_datos
