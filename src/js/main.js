@@ -1,147 +1,152 @@
+// Import libraries
 import Swal from "sweetalert2";
+import axios from "axios";
 
-// Product list (starts empty)
-let products = [];
+// API URL
+const apiUrl = "http://localhost:3000/products";
+let products = []; // Products array
 
-// DOM references
+// DOM elements
 const $name = document.getElementById("name");
 const $price = document.getElementById("price");
 const $btnSave = document.getElementById("btn-save");
 const $productList = document.getElementById("product-list");
 const $form = document.getElementById("product-form");
 
-// Create table with headers
+// Create table
 const table = document.createElement("table");
 table.setAttribute("id", "product-table");
 
 const thead = document.createElement("thead");
 const headerRow = document.createElement("tr");
-const thId = document.createElement("th");
-thId.textContent = "ID";
-const thName = document.createElement("th");
-thName.textContent = "Name";
-const thPrice = document.createElement("th");
-thPrice.textContent = "Price";
-const thOptions = document.createElement("th");
-thOptions.textContent = "Options";
-
-headerRow.appendChild(thId);
-headerRow.appendChild(thName);
-headerRow.appendChild(thPrice);
-headerRow.appendChild(thOptions);
+["ID", "Name", "Price", "Options"].forEach(text => {
+    const th = document.createElement("th");
+    th.textContent = text;
+    headerRow.appendChild(th);
+});
 thead.appendChild(headerRow);
 table.appendChild(thead);
 $productList.appendChild(table);
 
-// Generate random unique ID
-function generateRandomId() {
-    const randomId = Math.floor(Math.random() * 9000) + 1000;
-    const exists = products.find(p => p.id === randomId);
-    return exists ? generateRandomId() : randomId;
-}
-
-// Save a new product
-function saveProduct() {
-    const productName = $name.value.trim();
-    const priceValue = parseFloat($price.value);
-
-    if (!productName || isNaN(priceValue) || priceValue <= 0) {
-        Swal.fire("Error", "Please enter valid values.", "error");
-        return;
-    }
-
-    if (products.some(p => p.name.toLowerCase() === productName.toLowerCase())) {
-        Swal.fire("Error", "That product name already exists.", "error");
-        return;
-    }
-
-    const newProduct = {
-        id: generateRandomId(),
-        name: productName,
-        price: priceValue,
-    };
-
-    products.push(newProduct);
-    $name.value = "";
-    $price.value = "";
-
-    Swal.fire("Saved", "Product saved successfully.", "success");
-    displayProducts();
-}
-
-// Show products on the page
-function displayProducts() {
+// Show products in table
+async function displayProducts() {
     const table = document.getElementById("product-table");
     const oldTbody = table.querySelector("tbody");
     if (oldTbody) oldTbody.remove();
 
     const tbody = document.createElement("tbody");
 
-    products.forEach(product => {
-        const tr = document.createElement("tr");
+    try {
+        const response = await axios.get(apiUrl);
+        products = response.data;
 
-        const tdId = document.createElement("td");
-        tdId.textContent = product.id;
+        products.forEach(product => {
+            const tr = document.createElement("tr");
 
-        const tdName = document.createElement("td");
-        tdName.textContent = product.name;
+            const tdId = document.createElement("td");
+            tdId.textContent = product.id;
 
-        const tdPrice = document.createElement("td");
-        tdPrice.textContent = `$${product.price.toFixed(2)}`;
+            const tdName = document.createElement("td");
+            tdName.textContent = product.name;
 
-        const tdOptions = document.createElement("td");
-        const btnEdit = document.createElement("button");
-        btnEdit.textContent = "Edit";
-        btnEdit.addEventListener("click", () => updateProduct(product.id));
+            const tdPrice = document.createElement("td");
+            tdPrice.textContent = `$${product.price.toFixed(2)}`;
 
-        const btnDelete = document.createElement("button");
-        btnDelete.textContent = "Delete";
-        btnDelete.addEventListener("click", () => deleteProduct(product.id));
+            const tdOptions = document.createElement("td");
+            tdOptions.setAttribute("id", "buttons"); // Options buttons here
 
-        tdOptions.appendChild(btnEdit);
-        tdOptions.appendChild(btnDelete);
+            const btnEdit = document.createElement("button");
+            btnEdit.textContent = "Edit";
+            btnEdit.addEventListener("click", () => updateProduct(product.id));
 
-        tr.appendChild(tdId);
-        tr.appendChild(tdName);
-        tr.appendChild(tdPrice);
-        tr.appendChild(tdOptions);
-        tbody.appendChild(tr);
-    });
+            const btnDelete = document.createElement("button");
+            btnDelete.textContent = "Delete";
+            btnDelete.addEventListener("click", () => deleteProduct(product.id));
 
-    table.appendChild(tbody);
+            tdOptions.appendChild(btnEdit);
+            tdOptions.appendChild(btnDelete);
+
+            tr.appendChild(tdId);
+            tr.appendChild(tdName);
+            tr.appendChild(tdPrice);
+            tr.appendChild(tdOptions);
+            tbody.appendChild(tr);
+        });
+
+        table.appendChild(tbody);
+    } catch (err) {
+        console.log("Error in loading products:", err); // Uh, error here
+    }
+}
+
+// Save new product
+async function saveProduct() {
+    const productName = $name.value.trim();
+    const priceValue = parseFloat($price.value);
+
+    // Check if input is good
+    if (!productName || isNaN(priceValue) || priceValue <= 0) {
+        Swal.fire("Error", "Please enter valid values.", "error");
+        return;
+    }
+
+    try {
+        const res = await axios.get(apiUrl);
+        const existing = res.data;
+
+        if (existing.some(p => p.name.toLowerCase() === productName.toLowerCase())) {
+            Swal.fire("Error", "That product name already exists.", "error");
+            return;
+        }
+
+        await axios.post(apiUrl, { name: productName, price: priceValue });
+
+        $name.value = "";
+        $price.value = "";
+
+        Swal.fire("Saved", "Product saved.", "success");
+        displayProducts();
+    } catch (err) {
+        console.log("Error saving product:", err); // Something went wrong
+    }
 }
 
 // Delete product
-function deleteProduct(id) {
-    Swal.fire({
+async function deleteProduct(id) {
+    const result = await Swal.fire({
         title: "Are you sure?",
         text: "This can't be undone!",
         icon: "warning",
         showCancelButton: true,
         confirmButtonText: "Yes, delete it!",
         cancelButtonText: "Cancel"
-    }).then(result => {
-        if (result.isConfirmed) {
-            products = products.filter(p => p.id !== id);
-            displayProducts();
-            Swal.fire("Deleted!", "Product deleted.", "success");
-        }
     });
+
+    if (result.isConfirmed) {
+        try {
+            await axios.delete(`${apiUrl}/${id}`);
+            Swal.fire("Deleted!", "Product deleted.", "success");
+            displayProducts();
+        } catch (err) {
+            console.log("Error deleting product:", err); // Oops, error delete
+        }
+    }
 }
 
-// Start editing a product
+// Prepare to edit product
 function updateProduct(id) {
     const product = products.find(p => p.id === id);
     if (!product) return;
 
     $name.value = product.name;
     $price.value = product.price;
+
     $btnSave.textContent = "Update";
     $btnSave.setAttribute("data-id", id);
 }
 
 // Save updated product
-function saveUpdatedProduct(id) {
+async function saveUpdatedProduct(id) {
     const productName = $name.value.trim();
     const priceValue = parseFloat($price.value);
 
@@ -150,35 +155,45 @@ function saveUpdatedProduct(id) {
         return;
     }
 
-    const currentProduct = products.find(p => p.id === Number(id));
-    if (!currentProduct) return;
+    try {
+        const currentProduct = await axios.get(`${apiUrl}/${id}`);
+        const current = currentProduct.data;
 
-    const nameChanged = currentProduct.name.toLowerCase() !== productName.toLowerCase();
-    const priceChanged = currentProduct.price !== priceValue;
+        const nameChanged = current.name.toLowerCase() !== productName.toLowerCase();
+        const priceChanged = current.price !== priceValue;
 
-    if (!nameChanged && !priceChanged) {
-        Swal.fire("Error", "You must change at least one field.", "error");
-        return;
+        if (!nameChanged && !priceChanged) {
+            Swal.fire("Error", "You must change at least one field.", "error");
+            return;
+        }
+
+        const allProducts = await axios.get(apiUrl); 
+        if (
+            nameChanged &&
+            allProducts.data.some(p => p.name.toLowerCase() === productName.toLowerCase())
+        ) {
+            Swal.fire("Error", "Name already used by another product.", "error");
+            return;
+        }
+
+        await axios.patch(`${apiUrl}/${id}`, {
+            name: productName,
+            price: priceValue,
+        });
+
+        $name.value = "";
+        $price.value = "";
+        $btnSave.textContent = "Save";
+        $btnSave.removeAttribute("data-id");
+
+        displayProducts();
+        Swal.fire("Updated!", "Product updated.", "success");
+    } catch (err) {
+        console.log("Error updating product:", err); // Error in update
     }
-
-    if (nameChanged && products.some(p => p.name.toLowerCase() === productName.toLowerCase())) {
-        Swal.fire("Error", "Name already used by another product.", "error");
-        return;
-    }
-
-    currentProduct.name = productName;
-    currentProduct.price = priceValue;
-
-    $name.value = "";
-    $price.value = "";
-    $btnSave.textContent = "Save";
-    $btnSave.removeAttribute("data-id");
-
-    displayProducts();
-    Swal.fire("Updated!", "Product updated.", "success");
 }
 
-// Handle form submit
+// Handle form submission
 $form.addEventListener("submit", function (e) {
     e.preventDefault();
 
@@ -190,4 +205,5 @@ $form.addEventListener("submit", function (e) {
     }
 });
 
+// Initial load of products
 displayProducts();
